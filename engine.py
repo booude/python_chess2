@@ -22,6 +22,9 @@ class GameState:
         self.moveLog = []
         self.whiteKingLocation = (7, 4)
         self.blackKingLocation = (0, 4)
+        self.checkMate = False
+        self.staleMate = False
+        self.enPassantPossible = ()
 
     def makeMove(self, move):
         self.board[move.startRow][move.startCol] = "--"
@@ -34,6 +37,12 @@ class GameState:
             self.blackKingLocation = (move.endRow, move.endCol)
         if move.isPawnPromotion:
             self.board[move.endRow][move.endCol] = move.pieceMoved[0] + "q"
+        if move.isEnPassantMove:
+            self.board[move.startRow][move.endCol] = "--"
+        if move.pieceMoved[1] == "p" and abs(move.startRow - move.endRow) == 2:
+            self.enPassantPossible = ((move.startRow + move.endRow) // 2, move.startCol)
+        else:
+            self.enPassantPossible = ()
 
     def undoMove(self):
         if len(self.moveLog) > 0:
@@ -45,8 +54,15 @@ class GameState:
                 self.whiteKingLocation = (move.startRow, move.startCol)
             elif move.pieceMoved == "bk":
                 self.blackKingLocation = (move.startRow, move.startCol)
+            if move.isEnPassantMove:
+                self.board[move.endRow][move.endCol] = "--"
+                self.board[move.startRow][move.endCol] = move.pieceCaptured
+                self.enPassantPossible = (move.endRow, move.endCol)
+            if move.pieceMoved[1] == "p" and abs(move.startRow - move.endRow) == 2:
+                self.enPassantPossible = ()
 
     def getValidMoves(self):
+        tempEnPassantPossible = self.enPassantPossible
         moves = self.getPossibleMoves()
         for i in range(len(moves) - 1, -1, -1):
             self.makeMove(moves[i])
@@ -63,6 +79,7 @@ class GameState:
         else:
             self.checkMate = False
             self.staleMate = False
+        self.enPassantPossible = tempEnPassantPossible
         return moves
 
     def inCheck(self):
@@ -105,9 +122,17 @@ class GameState:
             if c - 1 >= 0:
                 if self.board[r - 1][c - 1][0] == "b":
                     moves.append(Move((r, c), (r - 1, c - 1), self.board))
+                elif (r - 1, c - 1) == self.enPassantPossible:
+                    moves.append(
+                        Move((r, c), (r - 1, c - 1), self.board, isEnPassantMove=True)
+                    )
             if c + 1 < len(self.board[0]):
                 if self.board[r - 1][c + 1][0] == "b":
                     moves.append(Move((r, c), (r - 1, c + 1), self.board))
+                elif (r - 1, c + 1) == self.enPassantPossible:
+                    moves.append(
+                        Move((r, c), (r - 1, c + 1), self.board, isEnPassantMove=True)
+                    )
         else:
             if self.board[r + 1][c] == "--":
                 moves.append(Move((r, c), (r + 1, c), self.board))
@@ -116,9 +141,17 @@ class GameState:
             if c - 1 >= 0:
                 if self.board[r + 1][c - 1][0] == "w":
                     moves.append(Move((r, c), (r + 1, c - 1), self.board))
+                elif (r + 1, c - 1) == self.enPassantPossible:
+                    moves.append(
+                        Move((r, c), (r + 1, c - 1), self.board, isEnPassantMove=True)
+                    )
             if c + 1 < len(self.board[0]):
                 if self.board[r + 1][c + 1][0] == "w":
                     moves.append(Move((r, c), (r + 1, c + 1), self.board))
+                elif (r + 1, c + 1) == self.enPassantPossible:
+                    moves.append(
+                        Move((r, c), (r + 1, c + 1), self.board, isEnPassantMove=True)
+                    )
 
     def getRookMoves(self, r, c, moves):
         directions = ((-1, 0), (0, -1), (1, 0), (0, 1))
@@ -213,18 +246,19 @@ class Move:
     filesToCols = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6, "h": 7}
     colsToFiles = {v: k for k, v in filesToCols.items()}
 
-    def __init__(self, startSq, endSq, board):
+    def __init__(self, startSq, endSq, board, isEnPassantMove=False):
         self.startRow = startSq[0]
         self.startCol = startSq[1]
         self.endRow = endSq[0]
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
-        self.isPawnPromotion = False
-        if (self.pieceMoved == "wp" and self.endRow == 0) or (
+        self.isPawnPromotion = (self.pieceMoved == "wp" and self.endRow == 0) or (
             self.pieceMoved == "bp" and self.endRow == 7
-        ):
-            self.isPawnPromotion = True
+        )
+        self.isEnPassantMove = isEnPassantMove
+        if self.isEnPassantMove:
+            self.pieceCaptured = "wp" if self.pieceMoved == "bp" else "bp"
         self.moveId = (
             self.startRow * 1000 + self.startCol * 100 + self.endRow * 10 + self.endCol
         )
