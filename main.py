@@ -1,5 +1,6 @@
 import pygame as p
 import engine
+import sys
 
 WIDTH = HEIGHT = 800
 DIMENSION = 8
@@ -22,11 +23,29 @@ def main():
     clock = p.time.Clock()
     gs = engine.GameState()
     loadImages()
-    running = True
-    while running:
+    sqSelected = ()
+    playerClicks = []
+    while True:
         for e in p.event.get():
             if e.type == p.QUIT:
-                running = False
+                p.quit()
+                sys.exit()
+            elif e.type == p.MOUSEBUTTONDOWN:
+                location = p.mouse.get_pos()
+                col = location[0] // SQSIZE
+                row = location[1] // SQSIZE
+                if sqSelected == (row, col):
+                    sqSelected = ()
+                    playerClicks = []
+                else:
+                    sqSelected = (row, col)
+                    playerClicks.append(sqSelected)
+                if len(playerClicks) == 2:
+                    move = engine.Move(playerClicks[0], playerClicks[1], gs.board)
+                    print(move.getChessNotation())
+                    gs.makeMove(move)
+                    sqSelected = ()
+                    playerClicks = []
         drawGameState(screen, gs)
         clock.tick(MAX_FPS)
         p.display.flip()
@@ -34,7 +53,6 @@ def main():
 
 def drawGameState(screen, gs):
     drawBoard(screen)
-
     drawPieces(screen, gs.board)
 
 
